@@ -1,0 +1,80 @@
+---
+title: "C8PA"
+author: "Angela Kim"
+date: "February 7, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(caret)
+```
+
+Read in the testing data set and remove variables that have more than 80% missing values. 
+```{r}
+dat <- read.csv("pml-training.csv")
+dim(dat)
+dat <- dat[,-which(colMeans(is.na(dat))>0.8)]
+```
+
+Remove variables that have near zero variability. 
+```{r}
+nzero <- nearZeroVar(dat, saveMetrics=TRUE) 
+nzero.index <- which(nzero$nzv==TRUE) 
+dat <- dat[,-nzero.index]
+```
+
+Reading the variable names, remove the ones that would likely not be useful in predicting classe (i.e. X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, num_window). 
+```{r}
+names(dat) 
+dat <- dat[,-c(1:6)]
+```
+
+Create a training set and a testing set. 
+```{r}
+inTrain <- createDataPartition(y=dat$classe, p=0.6, list=FALSE)
+training <- dat[inTrain, ]
+testing <- dat[-inTrain, ]
+```
+
+Attempt 1: Prediction with Trees. 
+```{r}
+mod.tree <- train(classe~., method="rpart", dat=training) 
+pred.tree <- predict(mod.tree, newdata=testing)
+confusionMatrix(pred.tree, testing$classe)
+##accuracy is only 0.495
+```
+Accuracy is only 0.495 and 0.99 is needed. 
+
+Attempt 2: Random Forest with Parallel Processing. Majority of this code was taken from the "Improving Performance of Random Forest in caret::train()" posted on github by the Community Teaching Assistants as posted on the discussion forum. 
+```{r}
+library(parallel)
+library(doParallel)
+cluster <- makeCluster(detectCores()-1)
+registerDoParallel(cluster) 
+fitControl <- trainControl(method="cv", number=5, allowParallel=TRUE) 
+mod.rf <- train(classe~., method="rf", data=training, trControl=fitControl) 
+stopCluster(cluster)
+registerDoSEQ() 
+pred.rf <- predict(mod.rf, newdata=testing) 
+confusionMatrix(pred.rf, testing$classe) 
+##now we have accuracy 0.9999! 
+```
+
+Final test. Load in testing data set. Do the same pre-processing as was done for training data set.
+```{r}
+fin.test <- read.csv("pml-testing.csv") 
+fin.test <- fin.test[,-which(colMeans(is.na(fin.test))>0.8)]
+nzero <- nearZeroVar(fin.test, saveMetrics = TRUE) 
+nzero.index <- which(nzero$nzv==TRUE) 
+fin.test <- fin.test[,-nzero.index]
+fin.test <- fin.test[,-c(1:6)]
+fin.pred <- predict(mod.rf, newdata=fin.test) 
+fin.pred
+```
+
+
+
+*****booya 100% baby*****
