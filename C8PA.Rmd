@@ -75,6 +75,10 @@ fin.pred <- predict(mod.rf, newdata=fin.test)
 fin.pred
 ```
 
-
+Then we calculate out of sample accuracy. 
+```{r}
+sum(fin.pred==testing$classe)
+```
+Out of sample accuracy is 86.95%
 
 *****booya 100% baby*****
